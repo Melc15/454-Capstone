@@ -29,7 +29,7 @@ bool IRSensor::check_state() {
 };
 
 bool IRSensor::check_state_cont(bool& stop) {
-    while (stop == false) {
+    while (!stop) {
         sensor_state = digitalRead(sensor_pin);
         if (sensor_state == LOW) {
             count = count + 1;
@@ -51,7 +51,9 @@ void IRSensor::set_state(bool state) {
     sensor_state = state;
 };
 
-void IRSensor::change_pin(int& new_sensor_pin, int& new_led_pin): sensor_pin(new_sensor_pin), led_pin(new_led_pin){
+void IRSensor::change_pin(int& new_sensor_pin, int& new_led_pin){
+    sensor_pin = new_sensor_pin;
+    led_pin = new_led_pin;
     pinMode(new_led_pin, OUTPUT);
     pinMode(new_sensor_pin, INPUT);
     digitalWrite(new_sensor_pin, HIGH);

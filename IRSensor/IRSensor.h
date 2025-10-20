@@ -4,10 +4,8 @@
 
 #ifndef IRSENSOR_H
 #define IRSENSOR_H
-#include 'Arduino.h'
-#include <string>
-
-
+#include <Arduino.h>
+#include <string.h>
 class IRSensor {
 private:
     int sensor_pin;

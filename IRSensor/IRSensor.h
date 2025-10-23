@@ -1,9 +1,4 @@
-//
-// Created by Kevin Gao on 2025-10-19.
-//
-
-#ifndef IRSENSOR_H
-#define IRSENSOR_H
+#pragma once
 #include <Arduino.h>
 
 class IRSensor {

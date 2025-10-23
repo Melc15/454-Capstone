@@ -18,6 +18,3 @@ public:
     void change_pin(int& new_sensor_pin, int& new_led_pin);
 };
 
-
-
-#endif //IRSENSOR_H

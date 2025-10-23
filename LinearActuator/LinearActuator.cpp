@@ -4,7 +4,7 @@ LinearActuator::LinearActuator(int& pin_pos, int& pin_neg) : pin_pos(pin_pos), p
     pinMode(pin_pos, OUTPUT);
     pinMode(pin_neg, OUTPUT);
 };
-void LinearActuator::push(){
+void LinearActuator::push( ){
     digitalWrite(pin_pos, HIGH);
     digitalWrite(pin_neg, LOW);
 };

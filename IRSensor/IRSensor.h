@@ -1,10 +1,6 @@
-//
-// Created by Kevin Gao on 2025-10-19.
-//
-
-#ifndef IRSENSOR_H
-#define IRSENSOR_H
+#pragma once
 #include <Arduino.h>
+#include <Chrono.h>
 
 class IRSensor {
 private:
@@ -14,15 +10,11 @@ private:
     bool sensor_state;
 public:
     IRSensor(int& sensor_pin, int& led_pin);
-    int get_count();
+    int get_count() const;
     void incr_count();
     bool check_state();
-    bool check_state_cont(bool& stop);
+    int count_breaks(int seconds,  int l_delay = 1000);
     void reset_counter();
     void set_state(bool state);
     void change_pin(int& new_sensor_pin, int& new_led_pin);
 };
-
-
-
-#endif //IRSENSOR_H

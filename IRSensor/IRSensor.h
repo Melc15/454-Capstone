@@ -18,3 +18,4 @@ public:
     void set_state(bool state);
     void change_pin(int& new_sensor_pin, int& new_led_pin);
 };
+

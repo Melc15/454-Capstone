@@ -1,7 +1,3 @@
-//
-// Created by Kevin Gao on 2025-10-19.
-//
-
 #include "IRSensor.h"
 
 IRSensor::IRSensor(int &sensor_pin, int &led_pin): sensor_pin(sensor_pin), led_pin(led_pin){

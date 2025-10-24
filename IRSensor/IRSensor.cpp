@@ -1,7 +1,7 @@
 #include "IRSensor.h"
 
 IRSensor::IRSensor(int &sensor_pin, int &led_pin): sensor_pin(sensor_pin), led_pin(led_pin){
-    sensor_state = true;
+    sensor_state = digitalRead(sensor_pin);
     change_pin(sensor_pin, led_pin);
     count = 0;
 };
@@ -18,7 +18,7 @@ bool IRSensor::check_state() {
 };
 
 int IRSensor::count_breaks(int seconds,  int l_delay) {
-    chrono timer;
+    Chrono timer(Chrono::SECONDS);
     bool prev_state = check_state();
     bool check_bool = not(prev_state);
     while(true) {
@@ -33,7 +33,6 @@ int IRSensor::count_breaks(int seconds,  int l_delay) {
             check_bool = true;
         if (check_bool)
             prev_state = sensor_state;
-        delay(l_delay);
         if (timer.elapsed() >= seconds)
             break;
     }
@@ -55,6 +54,6 @@ void IRSensor::change_pin(int& new_sensor_pin, int& new_led_pin){
     sensor_pin = new_sensor_pin;
     led_pin = new_led_pin;
     pinMode(new_led_pin, OUTPUT);
-    pinMode(new_sensor_pin, INPUT);
+    pinMode(new_sensor_pin, INPUT_PULLUP);
     sensor_state = true;
 };

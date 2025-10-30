@@ -130,6 +130,37 @@ bool RTC::change_pin(int pin_number_new){
     pin_number = pin_number_new;
 };
 
+void RTC::set_alarm1(byte DOW, String time, bool A1dDy){
+    byte hr, min, sec;
+    scanf(time.c_str(), "%d:%d:%d", &hr, &min, &sec);
+    byte AlarmBits = 0b00000000; // alarm every week and it checks the hr, min ,sec
+    clock.setA1Time(DOW, hr, min, sec, AlarmBits, A1dDy, h12Flag, pmFlag);
+    clock.turnOnAlarm(1);
+    clock.checkIfAlarm(1);
+};
+
+String RTC::get_alarm1_time(bool PM){
+    String out;
+    byte DOW, hr, min, sec, AlarmBits;
+    bool A1Dy;
+    clock.getA1Time(DOW, hr, min, sec, AlarmBits, A1Dy, h12Flag, pmFlag);
+    out += char('0' + (hr  / 10));
+    out += char('0' + (hr  % 10));
+    out += ':';
+    out += char('0' + (min / 10));
+    out += char('0' + (min % 10));
+    out += ':';
+    out += char('0' + (sec / 10));
+    out += char('0' + (sec % 10));
+    return out;
+};
+
+bool RTC::check_alarm(int alarm_number){
+    return clock.checkIfAlarm(alarm_number, false);
+};
+
+
+
 //// NEED TO IMPLEMENT ALARM FUNCTIONS
 
 

@@ -19,6 +19,8 @@ class RTC{
     bool check_DOW_time(byte& DOW, String& time);
     bool set_clock(String date, String DOW, String time);
     bool change_pin(int pin_number_new);
-
+    void set_alarm1(byte DOW, String time, bool A1dDy = true);
+    String get_alarm1_time(bool PM);
+    bool check_alarm(int alarm_number);
   //// NEED ALARM FUNCTIONS
 };

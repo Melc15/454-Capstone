@@ -2,64 +2,76 @@
 /// VERY BAD IMPLEMENTATION
 #include "RTC.h"
 
-RTC::RTC(int pin_number, byte DOW, String& time, String& date) : pin_number(pin_number), h12Flag(true), pmFlag(true){
-    // Parsing inputted strings
-    byte mm, dd, yyyy;
-    scanf(date.c_str(), "%d/%d/%d", &mm, &dd, &yyyy);
-    byte hr, min, sec;
-    scanf(time.c_str(), "%d:%d:%d", &hr, &min, &sec);
-    // Initializing things
+static bool parseDate(const String& s, uint8_t& m, uint8_t& d, uint16_t& y) {
+    int im=0, id=0, iy=0;
+    if (sscanf(s.c_str(), "%d/%d/%d", &im, &id, &iy) != 3) return false;
+    if (im<1||im>12 || id<1||id>31 || iy<0) return false;
+    m=(uint8_t)im; d=(uint8_t)id; y=(uint16_t)iy;
+    return true;
+}
+
+static bool parseTime(const String& s, uint8_t& h, uint8_t& m, uint8_t& se) {
+    int ih=0, im=0, is=0;
+    if (sscanf(s.c_str(), "%d:%d:%d", &ih, &im, &is) != 3) return false;
+    if (ih<0||ih>23 || im<0||im>59 || is<0||is>59) return false;
+    h=(uint8_t)ih; m=(uint8_t)im; se=(uint8_t)is;
+    return true;
+}
+
+String format_str(uint8_t d1, uint8_t d2, uint16_t d3, char delim) {
+    // e.g., time: HH:MM:SS -> 8 chars + null
+    char buf[11]; // enough for "MM/DD/YYYY" too
+    snprintf(buf, sizeof(buf), "%02u%c%02u%c%04u", d1, delim, d2, delim, d3);
+    return String(buf);
+}
+
+RTC::RTC(int pin_number, byte mm, byte dd, byte yyyy, byte min, byte sec, byte DOW)
+: mm_init(mm), dd_init(dd), yyyy_init(yyyy), min_init(min), sec_init(sec), DOW_init(DOW), interp_pin(pin_number), h12Flag(1), pmFlag(1){
+}
+
+RTC::RTC(int pin_number, byte DOW, String& time, String& date): DOW_init(DOW), interp_pin(pin_number), h12Flag(1), pmFlag(1)
+{
+    uint8_t mm_i, dd_i, hr_i, min_i, sec_i;
+    uint16_t yyyy_i;
+    parseDate(date, mm_i, dd_i, yyyy_i);
+    parseTime(time, hr_i,  min_i, sec_i);
+    mm_init = mm_i;
+    dd_init = dd_i;
+    yyyy_init = yyyy_i;
+    hr_init = hr_i;
+    min_init = min_i;
+    sec_init = sec_i;
+}
+
+bool RTC::begin(byte& tick_var) {
     Wire.begin();
     clock.setClockMode(true);
-
-    // Setting the clock values
-    clock.setYear(yyyy);
-    clock.setMonth(mm);
-    clock.setDate(dd);
-    clock.setDoW(DOW);
-    clock.setHour(hr);
-    clock.setMinute(min);
-    clock.setSecond(sec);
-
-};
+    clock.setYear(yyyy_init % 100);  // DS3231 2-digit year
+    clock.setMonth(mm_init);
+    clock.setDate(dd_init);
+    clock.setDoW(DOW_init);
+    clock.setHour(hr_init);
+    clock.setMinute(min_init);
+    clock.setSecond(sec_init);
+    pinMode(interp_pin, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(interp_pin), tick_var, FALLING);
+    tick = tick_var;
+    return true;
+}
 
 String RTC::get_time_str() {
     byte hr  = clock.getHour(h12Flag, pmFlag);
     byte min = clock.getMinute();
     byte sec = clock.getSecond();
-
-    String out;
-    out.reserve(8);              // "HH:MM:SS"
-
-    out += char('0' + (hr  / 10));
-    out += char('0' + (hr  % 10));
-    out += ':';
-    out += char('0' + (min / 10));
-    out += char('0' + (min % 10));
-    out += ':';
-    out += char('0' + (sec / 10));
-    out += char('0' + (sec % 10));
-
-    return out;
+    return format_str(hr, min, sec ':');
 }
 
 String RTC::get_date_str() {
     bool century = false;
-    unsigned mm   = clock.getMonth(century);
-    unsigned dd   = clock.getDate();
-    unsigned yyyy = 2000u + clock.getYear();
-
-    String s;
-    s.reserve(10);
-    if (mm < 10) s += '0'; s += mm; s += '/';
-    if (dd < 10) s += '0'; s += dd; s += '/';
-    s += (yyyy / 1000) % 10;
-    s += (yyyy / 100)  % 10;
-    s += (yyyy / 10)   % 10;
-    s += (yyyy % 10);
-
-    s.setCharAt(s.length()-4, char('0' + (yyyy / 1000) % 10));
-    return s;
+    uint8_t mm = clock.getMonth(century);
+    uint8_t dd = clock.getDate();
+    uint16_t yyyy = 2000u + clock.getYear();
+    return format_str(mm, dd, yyyy, '/');
 }
 
 byte RTC::get_DOW_byte() {
@@ -67,31 +79,15 @@ byte RTC::get_DOW_byte() {
 };
 
 String RTC::get_DOW_str() {
-    // Backing storage for the Vector (fixed-size).
-    // We store pointers to flash strings to avoid RAM bloat.
-    static const __FlashStringHelper* backing[8];
-
-    // Many Arduino Vector libs use (buffer, capacity) ctor:
-    static Vector<const __FlashStringHelper*> days(backing, 8);
-
-    // One-time fill
-    if (days.size() == 0) {
-        days.push_back(F("Invalid Day")); // index 0 (placeholder if your RTC is 1-based)
-        days.push_back(F("Monday"));
-        days.push_back(F("Tuesday"));
-        days.push_back(F("Wednesday"));
-        days.push_back(F("Thursday"));
-        days.push_back(F("Friday"));
-        days.push_back(F("Saturday"));
-        days.push_back(F("Sunday"));
-    }
-
+    static const __FlashStringHelper* const names[] = {
+            F("Invalid Day"),
+            F("Monday"), F("Tuesday"), F("Wednesday"),
+            F("Thursday"), F("Friday"), F("Saturday"), F("Sunday")
+    };
     uint8_t i = get_DOW_byte();
-    if (i >= days.size()) i = 0;  // clamp/guard
-
-    // Construct a RAM String from the flash-stored string pointer.
-    return String(days[i]);
-};
+    if (i > 7) i = 0;
+    return String(names[i]);
+}
 
 bool RTC::check_DOW_time(byte& DOW, String& time) {
     byte hr_now = clock.getHour(h12Flag, pmFlag);
@@ -107,16 +103,15 @@ bool RTC::check_DOW_time(byte& DOW, String& time) {
     }
     return false;
 };
-bool RTC::set_clock(String date, String DOW, String time) {
+bool RTC::set_clock(String date, byte DOW, String time) {
 
     byte mm, dd, yyyy;
     scanf(date.c_str(), "%d/%d/%d", &mm, &dd, &yyyy);
     byte hr, min, sec;
     scanf(time.c_str(), "%d:%d:%d", &hr, &min, &sec);
-    byte DOW_byte = static_cast<byte>(DOW.toInt());
 
-    // Initializing things
-    clock.setClockMode(true);
+    RTC(interp_pin, mm, dd, yyyy, min, sec, DOW);
+
     clock.setYear(yyyy);
     clock.setMonth(mm);
     clock.setDate(dd);
@@ -124,19 +119,29 @@ bool RTC::set_clock(String date, String DOW, String time) {
     clock.setHour(hr);
     clock.setMinute(min);
     clock.setSecond(sec);
+    return 1;
 };
 
 bool RTC::change_pin(int pin_number_new){
-    pin_number = pin_number_new;
+    interp_pin = pin_number_new;
 };
 
 void RTC::set_alarm1(byte DOW, String time, bool A1dDy){
     byte hr, min, sec;
-    scanf(time.c_str(), "%d:%d:%d", &hr, &min, &sec);
-    byte AlarmBits = 0b00000000; // alarm every week and it checks the hr, min ,sec
+    if (!parseTime(time, hr,  min, sec)) { Serial.println("Bad time"); }
+    byte AlarmBits = 0b00000000; // alarm every week and it checks the hr_init, min_init ,sec_init
     clock.setA1Time(DOW, hr, min, sec, AlarmBits, A1dDy, h12Flag, pmFlag);
     clock.turnOnAlarm(1);
     clock.checkIfAlarm(1);
+};
+
+void RTC::set_alarm2(byte DOW, String time, bool A2dDy){
+    byte hr, min, sec;
+    if (!parseTime(time, hr, min, sec)) { Serial.println("Bad time"); }
+    byte AlarmBits = 0b00000000; // alarm every week and it checks the hr_init, min_init ,sec_init
+    clock.setA2Time(DOW, hr, min, AlarmBits, A2dDy, h12Flag, pmFlag);
+    clock.turnOnAlarm(2);
+    clock.checkIfAlarm(2);
 };
 
 String RTC::get_alarm1_time(bool PM){
@@ -144,15 +149,16 @@ String RTC::get_alarm1_time(bool PM){
     byte DOW, hr, min, sec, AlarmBits;
     bool A1Dy;
     clock.getA1Time(DOW, hr, min, sec, AlarmBits, A1Dy, h12Flag, pmFlag);
-    out += char('0' + (hr  / 10));
-    out += char('0' + (hr  % 10));
-    out += ':';
-    out += char('0' + (min / 10));
-    out += char('0' + (min % 10));
-    out += ':';
-    out += char('0' + (sec / 10));
-    out += char('0' + (sec % 10));
-    return out;
+    return format_str(hr, min, sec, ":");
+}
+
+String RTC::get_alarm2_time(bool PM){
+    String out;
+    byte DOW, hr, min, sec, AlarmBits;
+    sec = 0;
+    bool A1Dy;
+    clock.getA2Time(DOW, hr, min, AlarmBits, A1Dy, h12Flag, pmFlag);
+    return format_str(hr, min, sec, ":");
 };
 
 bool RTC::check_alarm(int alarm_number){

@@ -1,0 +1,29 @@
+#include <SoftwareSerial.h> //Handles bluetooth communication
+SoftwareSerial BTSerial (2,3); //Pin 2 and pin 3 for the Serial Rx (Recieve) and Tx (Transmit) on the HC-05 bluetooth module
+//To interface with the module
+
+//Define cariables
+int sensor_pin = 5; //Whichever pin the IR beam sensor is connected to
+
+
+void setup() {
+  //Need a pin for the signal-ex. pin 9
+  pinMode(9, OUTPUT);
+  digitalWrite(9, HIGH);
+
+  Serial.begin(38400);
+  Serial.printIn("Enter command:");
+  BTSerial.begin(38400);
+
+}
+
+void loop() {
+  // Send commands from the computer serial monitor to bluetooth module
+  if(Serial.available())
+    BTSerial.write(Serial.read());
+
+    //Send commands from bluetooth to computer
+  if (BTSerial.available())
+    Serial.write(BTSerial.read());
+
+}

@@ -27,11 +27,24 @@ String format_str(uint8_t d1, uint8_t d2, uint16_t d3, char delim) {
     return String(buf);
 }
 
-RTC::RTC(int pin_number, byte mm, byte dd, byte yyyy, byte hr, byte min, byte sec, byte DOW)
-: mm_init(mm), dd_init(dd), yyyy_init(yyyy), min_init(min), hr_init(hr), sec_init(sec), DOW_init(DOW), interp_pin(pin_number), h12Flag(1), pmFlag(1){
+byte DOW_from_str(const String& s){
+    String t = s;
+    t.trim(); t.toLowerCase();
+    if (t.startsWith("mon")) return 1;
+    if (t.startsWith("tue")) return 2;
+    if (t.startsWith("wed")) return 3;
+    if (t.startsWith("thu")) return 4;  // covers thu/thur/thurs
+    if (t.startsWith("fri")) return 5;
+    if (t.startsWith("sat")) return 6;
+    if (t.startsWith("sun")) return 7;
+    return 0; // invalid
 }
 
-RTC::RTC(int pin_number, byte DOW, String& time, String& date): DOW_init(DOW), interp_pin(pin_number), h12Flag(1), pmFlag(1)
+RTC::RTC(int pin_number, byte mm, byte dd, byte yyyy, byte hr, byte min, byte sec, byte DOW)
+: mm_init(mm), dd_init(dd), yyyy_init(yyyy), min_init(min), hr_init(hr), sec_init(sec), DOW_init(DOW), interp_pin(pin_number), h12Flag(0), pmFlag(0), A1_on(0), A2_on(0){
+}
+
+RTC::RTC(int pin_number, byte DOW, String& time, String& date): DOW_init(DOW), interp_pin(pin_number), h12Flag(0), pmFlag(0), A1_on(0), A2_on(0)
 {
     uint8_t mm_i, dd_i, hr_i, min_i, sec_i;
     uint16_t yyyy_i;
@@ -44,11 +57,26 @@ RTC::RTC(int pin_number, byte DOW, String& time, String& date): DOW_init(DOW), i
     min_init = min_i;
     sec_init = sec_i;
 }
+RTC::RTC(int pin_number, String& DOW, String& time, String& date): interp_pin(pin_number), h12Flag(0), pmFlag(0), A1_on(0), A2_on(0)
+{
+    byte DOW_byte = DOW_from_str(DOW);
+    byte mm, dd, hr, min, sec;
+    uint16_t yyyy;
+    parseDate(date, mm, dd, yyyy);
+    parseTime(time, hr, min, sec);
+    DOW_init = DOW_byte;
+    mm_init = mm;
+    dd_init = dd;
+    yyyy_init = yyyy;
+    hr_init = hr;
+    min_init = min;
+    sec_init = sec;
+}
 
 bool RTC::begin(volatile byte* tick_var) {
     s_tick_ptr = tick_var;
     Wire.begin();
-    clock.setClockMode(true);
+    clock.setClockMode(false);
     clock.setYear(yyyy_init % 100);  // DS3231 2-digit year
     clock.setMonth(mm_init);
     clock.setDate(dd_init);
@@ -67,7 +95,6 @@ bool RTC::begin(volatile byte* tick_var) {
     clock.setA2Time(0, 0, 0xFF, 0b01100000, false, false, false);
     clock.turnOffAlarm(2);
     clock.checkIfAlarm(2);
-
     pinMode(interp_pin, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(interp_pin),  RTC::isrThunk, FALLING);
     return true;
@@ -86,10 +113,10 @@ String RTC::get_time_str() {
 
 String RTC::get_date_str() {
     bool century = false;
-    uint8_t mm = clock.getMonth(century);
-    uint8_t dd = clock.getDate();
-    uint16_t yyyy = 2000u + clock.getYear();
-    return format_str(mm, dd, yyyy % 100, '/');
+    byte mm = clock.getMonth(century);
+    byte dd = clock.getDate();
+    byte yy = clock.getYear();
+    return format_str(mm, dd, yy, '/');
 }
 
 byte RTC::get_DOW_byte() {
@@ -107,28 +134,12 @@ String RTC::get_DOW_str() {
     return String(names[i]);
 }
 
-bool RTC::check_DOW_time(byte& DOW, String& time) {
-    byte hr_now = clock.getHour(h12Flag, pmFlag);
-    byte min_now = clock.getMinute();
-    byte sec_now = clock.getSecond();
-    byte DOW_now = get_DOW_byte();
-
-    byte hr, min, sec;
-    scanf(time.c_str(), "%d:%d:%d", &hr_now, &min_now, &sec_now);
-
-    if (hr_now < hr && min_now < min && sec_now < sec && DOW == DOW_now) {
-        return true;
-    }
-    return false;
-};
 bool RTC::set_clock(String date, byte DOW, String time) {
 
     byte mm, dd, yyyy;
     scanf(date.c_str(), "%d/%d/%d", &mm, &dd, &yyyy);
     byte hr, min, sec;
     scanf(time.c_str(), "%d:%d:%d", &hr, &min, &sec);
-
-    RTC(interp_pin, mm, dd, yyyy, hr, min, sec, DOW);
 
     clock.setYear(yyyy);
     clock.setMonth(mm);
@@ -137,30 +148,43 @@ bool RTC::set_clock(String date, byte DOW, String time) {
     clock.setHour(hr);
     clock.setMinute(min);
     clock.setSecond(sec);
-    return 1;
+    return true;
 };
 
 bool RTC::change_pin(int pin_number_new){
+    detachInterrupt(digitalPinToInterrupt(interp_pin));
     interp_pin = pin_number_new;
+    pinMode(interp_pin, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(interp_pin), RTC::isrThunk, FALLING);
+    return true;
+};
+void RTC::set_alarm1(String& DOW, String time, bool A1dDy){
+    byte DOW_byte  = DOW_from_str(DOW);
+    set_alarm1(DOW_byte, time, A1dDy);
+    return;
+
+};
+void RTC::set_alarm2(String& DOW, String time, bool A1dDy){
+    byte DOW_byte = DOW_from_str(DOW);
+    set_alarm2(DOW_byte, time, A1dDy);
 };
 
 void RTC::set_alarm1(byte DOW, String time, bool A1dDy){
+    clear_alarm(1);
     byte hr, min, sec;
     if (!parseTime(time, hr,  min, sec)) { Serial.println("Bad time"); }
     byte AlarmBits = 0b00000000; // alarm every week and it checks the hr_init, min_init ,sec_init
     clock.setA1Time(DOW, hr, min, sec, AlarmBits, A1dDy, h12Flag, pmFlag);
-    clock.turnOnAlarm(1);
-    clock.checkIfAlarm(1);
+    toggle_alarm(1);
 };
 
 void RTC::set_alarm2(byte DOW, String time, bool A2dDy){
-    clock.turnOffAlarm(1);
+    clear_alarm(2);
     byte hr, min, sec;
     if (!parseTime(time, hr, min, sec)) { Serial.println("Bad time"); }
     byte AlarmBits = 0b00000000; // alarm every week and it checks the hr_init, min_init ,sec_init
     clock.setA2Time(DOW, hr, min, AlarmBits, A2dDy, h12Flag, pmFlag);
-    clock.turnOnAlarm(2);
-    clock.checkIfAlarm(2);
+    toggle_alarm(2);
 };
 
 String RTC::get_alarm1_time(bool PM){
@@ -184,7 +208,45 @@ bool RTC::check_alarm(int alarm_number){
     return clock.checkIfAlarm(alarm_number, false);
 };
 
+void RTC::clear_alarm(int alarm_number){
+    if(alarm_number != 1 && alarm_number != 2){
+        Serial.println("Invalid alarm number");
+        return;
+    }
+    clock.checkIfAlarm(alarm_number);
+}
 
+void RTC::toggle_alarm(int alarm_number){
+    if(alarm_number == 1){
+        toggle_A1();
+    }
+    else if(alarm_number == 2){
+        toggle_A2();
+    }
+    else{
+        Serial.println("Invalid alarm number");
+        return;
+    }
+}
+
+void RTC::toggle_A1(){
+    if(A1_on){
+        clock.turnOffAlarm(1);
+    }
+    else{
+        clock.turnOnAlarm(1);
+    }
+    A1_on = A1_on;
+};
+void RTC::toggle_A2(){
+    if(A2_on){
+        clock.turnOffAlarm(2);
+        }
+    else{
+        clock.turnOnAlarm(2);
+    }
+    A2_on = !A2_on;
+};
 
 //// NEED TO IMPLEMENT ALARM FUNCTIONS
 

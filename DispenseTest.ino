@@ -39,6 +39,7 @@ void loop() {
         tick = 0;
         Serial.println("Alarm 1 is on!");
         ServoMotor* motors = sys.GetMotors();
+        sys.Dispense();
         sys.NextAlarm();
         Serial.println("Remaining alarms:");
         sys.PrintAlarms();

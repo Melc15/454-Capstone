@@ -1,10 +1,8 @@
 #include "Dispenser.h"
 
 
-Dispenser::Dispenser(RTC rtc, Servo motors_i[], IRSensor ir): alarms(alarms_store), pills_counts(pills_store), clock(rtc), ir(ir){
+Dispenser::Dispenser(RTC rtc, ServoMotor motors_i[], IRSensor ir): alarms(alarms_store), pill_counts(pills_store), motors(motors_store), clock(rtc), ir(ir){
     n_motors = sizeof(motors_i)/sizeof(motors_i[0]) + 1;;
-    motors_store = new Servo[n_motors];
-    motors.setStorage(motors_store);
     for(int i = 0; i < n_motors; i++){
         motors.push_back(motors_i[i]);
     }
@@ -12,7 +10,7 @@ Dispenser::Dispenser(RTC rtc, Servo motors_i[], IRSensor ir): alarms(alarms_stor
 }
 bool Dispenser::AddAlarm(String A_t, String A_DOW, int pills[]){
     if(sizeof(pills)/sizeof(pills[0]) + 1 != n_motors){
-        Serial.println("Pills != Number of motors")
+        Serial.println("Pills != Number of motors");
         return false;
     }
     CountRow C{};
@@ -66,11 +64,10 @@ void Dispenser::PrintAlarms(){
     }
 };
 
-bool* Dispenser::GetMotors(){
-    bool* M = new bool[motors[0].n];
-    for(int i = 0; i < motors[0].n; i++){
-        M[i] = motors[0].b[i];
-        Serial.println(motors[0].b[i]);
+ServoMotor* Dispenser::GetMotors(){
+    ServoMotor* M = new ServoMotor[n_motors];
+    for(int i = 0; i < n_motors; i++){
+        M[i] = motors[i];
     }
     return M;
 }
@@ -79,20 +76,20 @@ int Dispenser::Dispense(){
     CountRow counts = pill_counts[0];
     ir.reset_counter();
     int total_count = 0;
-    for(int i = 0; i < count.n; i++){
+    for(int i = 0; i < counts.n; i++){
         total_count += counts.count[i];
         for(int j = 0; j < counts.count[i]; j++) {
-            motors[0].full_ccw;
+            motors[0].full_ccw();
             ir.count_breaks(10, 1);
-            motors[0].full_cw;
+            motors[0].full_cw();
         }
     }
-    if(total_counts != ir.get_count()){
+    if(total_count != ir.get_count()){
         Serial.println("Misdispense Detected!");
         Serial.println("IR Beam Count: ");
         Serial.print(ir.get_count());
         Serial.println("Total Pills: ");
-        Serialprint(total_counts);
+        Serial.print(total_count);
     }
     return ir.get_count();
 }

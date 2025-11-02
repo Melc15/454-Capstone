@@ -1,7 +1,7 @@
 #pragma once
 #include "Vector.h"
 #include "RTC.h"
-#include "Servo.h"
+#include "ServoMotor.h"
 #include "IRSensor.h"
 static const int MAX_ALARMS = 10;
 static const int MAX_MOTORS = 6;  // set your max
@@ -26,16 +26,16 @@ private:
     CountRow pills_store[MAX_ALARMS];
     Vector<CountRow> pill_counts;
 
-    Servo* motors_store;
-    Vector<Servo> motors;
+    ServoMotor motors_store[MAX_MOTORS];
+    Vector<ServoMotor> motors;
 
 public:
     Dispenser() = delete;
-    Dispenser(RTC rtc, Servo motors_i[], IRSensor ir);
+    Dispenser(RTC rtc, ServoMotor motors_i[], IRSensor ir);
     bool AddAlarm(String A_t,  String A_DOW, int pills[]);
     bool NextAlarm();
     void PrintAlarms();
     bool RemoveAlarm(int number);
-    bool* GetMotors();
+    ServoMotor* GetMotors();
     int Dispense();
 };

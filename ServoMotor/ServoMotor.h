@@ -1,6 +1,6 @@
 #pragma once
 #include "Arduino.h"
-class Servo {
+class ServoMotor {
 private:
     double clb_fct;
     int curr_angle;
@@ -8,7 +8,8 @@ private:
 public:
     int MAX_ANGLE = 180;
     int MIN_ANGLE = 0;
-    Servo(pin, clb_fct):clb_fct(clb_fct), pin(pin), curr_angle(MIN_ANGLE){};
+    ServoMotor();
+    ServoMotor(int pin, double clb_fct);
     void pulse(int myAngle);
     void full_ccw();
     void full_cw();

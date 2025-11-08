@@ -44,4 +44,6 @@ class RTC{
     bool check_alarm(int alarm_number);
     void clear_alarm(int alarm_number);
     void toggle_alarm(int alarm_number);
+    String addtime_alarm(String time, int minutes);
+    String subtime_alarm(String time, int minutes);
 };

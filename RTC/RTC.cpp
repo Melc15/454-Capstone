@@ -85,7 +85,7 @@ bool RTC::begin(volatile byte* tick_var) {
     clock.setMinute(min_init);
     clock.setSecond(sec_init);
 
-    // Make sure both alarms are inert and flags are clear
+    // Make sure both alarms_1 are inert and flags are clear
     clock.turnOffAlarm(1);
     clock.turnOffAlarm(2);
     clock.checkIfAlarm(1);  // clears A1 flag
@@ -247,6 +247,42 @@ void RTC::toggle_A2(){
     }
     A2_on = !A2_on;
 };
+
+String RTC::addtime_alarm(String time, int minutes){
+    byte hr, min, sec;
+    if (!parseTime(time, hr,  min, sec)) { Serial.println("Bad time"); }
+    if(min + minutes >= 60){
+        if(hr >= 24){
+            hr = 0;
+        }
+        else{
+            hr = hr + 1;
+        }
+        min += minutes - 60;
+    }
+    else{
+        min += minutes;
+    }
+    return format_str(hr, min, sec, ':');
+}
+
+String RTC::subtime_alarm(String time, int minutes){
+    byte hr, min, sec;
+    if (!parseTime(time, hr,  min, sec)) { Serial.println("Bad time"); }
+    if(min - minutes <= 0){
+        if(hr <= 0){
+            hr = 23;
+        }
+        else{
+            hr = hr - 1;
+        }
+        min += -minutes + 60;
+    }
+    else{
+        min -= minutes;
+    }
+    return format_str(hr, min, sec, ':');
+}
 
 //// NEED TO IMPLEMENT ALARM FUNCTIONS
 

@@ -1,8 +1,8 @@
 #include "IRSensor.h"
 
-IRSensor::IRSensor(int &sensor_pin, int &led_pin): sensor_pin(sensor_pin), led_pin(led_pin){
+IRSensor::IRSensor(int &sensor_pin): sensor_pin(sensor_pin){
     sensor_state = digitalRead(sensor_pin);
-    change_pin(sensor_pin, led_pin);
+    change_pin(sensor_pin);
     count = 0;
 };
 
@@ -25,9 +25,6 @@ int IRSensor::count_breaks(int seconds,  int l_delay) {
         check_state();
         if ((sensor_state == HIGH && prev_state == LOW) && check_bool) {
             incr_count();
-            digitalWrite(led_pin, LOW);
-        } else if (sensor_state == LOW) {
-            digitalWrite(led_pin, HIGH);
         }
         if (sensor_state == LOW && !check_bool)
             check_bool = true;
@@ -37,7 +34,6 @@ int IRSensor::count_breaks(int seconds,  int l_delay) {
             break;
     }
     int final = count;
-    reset_counter();
     return final;
 };
 
@@ -50,10 +46,8 @@ void IRSensor::set_state(bool state) {
     sensor_state = state;
 };
 
-void IRSensor::change_pin(int& new_sensor_pin, int& new_led_pin){
+void IRSensor::change_pin(int& new_sensor_pin){
     sensor_pin = new_sensor_pin;
-    led_pin = new_led_pin;
-    pinMode(new_led_pin, OUTPUT);
     pinMode(new_sensor_pin, INPUT_PULLUP);
     sensor_state = true;
 };

@@ -1,95 +1,123 @@
 #include "Dispenser.h"
 
-
-Dispenser::Dispenser(RTC rtc, ServoMotor motors_i[], IRSensor ir): alarms(alarms_store), pill_counts(pills_store), motors(motors_store), clock(rtc), ir(ir){
-    n_motors = sizeof(motors_i)/sizeof(motors_i[0]) + 1;;
-    for(int i = 0; i < n_motors; i++){
-        motors.push_back(motors_i[i]);
-    }
-
+Dispenser::Dispenser(int n_motors, RTC rtc, IRSensor ir, LoadCell scale): alarms_1(alarms_store1), alarms_2(alarms_store2), pill_counts(pills_store), driver(), clock(rtc), ir(ir), n_motors(n_motors), pwm(112, 550), scale(scale), pills_weight(-1){
 }
-bool Dispenser::AddAlarm(String A_t, String A_DOW, int pills[]){
-    if(sizeof(pills)/sizeof(pills[0]) + 1 != n_motors){
-        Serial.println("Pills != Number of motors");
-        return false;
-    }
+
+void Dispenser::begin(volatile byte* tick){
+    scale.begin();
+    clock.begin(tick);
+    driver.resetDevices();
+    driver.init();
+    driver.setPWMFrequency(50);
+}
+
+bool Dispenser::AddAlarm(String A_t, String A_DOW, int pills[], int wait_before){
+    String A_t1 = clock.subtime_alarm(A_t, wait_before);
     CountRow C{};
     C.n = n_motors;
     for(int i = 0; i < C.n; i++){
         C.count[i] = pills[i];
     }
-    AlarmRow A{A_DOW, A_t};
-    alarms.push_back(A);
+    AlarmRow A1{A_DOW, A_t1};
+    AlarmRow A2{A_DOW, A_t};
+    alarms_1.push_back(A1);
+    alarms_2.push_back(A2);
     pill_counts.push_back(C);
-    if(alarms.size() == 1){
-        clock.set_alarm1(A_DOW, A_t);
+    if(alarms_1.size() == 1){
+        clock.set_alarm1(A_DOW, A_t1);
+        clock.set_alarm2(A_DOW, A_t);
     }
     return true;
 };
 bool Dispenser::NextAlarm(){
-    if(alarms.size() == 0){
-        Serial.println("No alarms in queue");
+    if(alarms_1.size() == 0){
+        Serial.println("No alarms_1 in queue");
         return false;
     }
-    alarms.remove(0);
+    if(alarms_1.size() == 1){
+        Serial.println("No next alarm");
+        return false;
+    }
+    alarms_1.remove(0);
+    alarms_2.remove(0);
     pill_counts.remove(0);
-    String A_DOW = alarms[0].DOW;
-    String A_t = alarms[0].time;
-    clock.set_alarm1(A_DOW, A_t);
+    String A_DOW = alarms_1[0].DOW;
+    String A_t1 = alarms_1[0].time;
+    clock.set_alarm1(A_DOW, A_t1);
+    String A_t2 = alarms_2[0].time;
+    clock.set_alarm2(A_DOW, A_t2);
+
     return true;
 };
 bool Dispenser::RemoveAlarm(int number){
-    if(alarms.size() == 0){
-        Serial.println("No alarms in queue");
+    if(alarms_1.size() == 0){
+        Serial.println("No alarms_1 in queue");
         return false;
     }
     if(number == 0){
         NextAlarm();
         return true;
     }
-    if(number >= alarms.size()){
+    if(number >= alarms_1.size()){
         Serial.println("Invalid alarm");
         return false;
     }
-    alarms.remove(number);
-    motors.remove(number);
+    alarms_1.remove(number);
+    alarms_2.remove(number);
+    pill_counts.remove(number);
     return true;
 };
 
 void Dispenser::PrintAlarms(){
-    for (size_t i = 0; i < alarms.size(); i++) {
-        Serial.print(alarms[i].DOW);
+    for (size_t i = 0; i < alarms_1.size(); i++) {
+        Serial.print(alarms_1[i].DOW);
         Serial.print(" ");
-        Serial.println(alarms[i].time);
+        Serial.println(alarms_1[i].time);
+        Serial.print(" ");
+        Serial.println(alarms_2[i].time);
     }
 };
 
-ServoMotor* Dispenser::GetMotors(){
-    ServoMotor* M = new ServoMotor[n_motors];
-    for(int i = 0; i < n_motors; i++){
-        M[i] = motors[i];
-    }
-    return M;
-}
 
-int Dispenser::Dispense(){
+int Dispenser::Dispense(int wait_after){
     CountRow counts = pill_counts[0];
     ir.reset_counter();
+    scale.tare();
     int total_count = 0;
-    for(int i = 0; i < counts.n; i++){
+    for(int i = 0; i < counts.n-1; i++){
         total_count += counts.count[i];
         for(int j = 0; j < counts.count[i]; j++) {
-            motors[0].full_ccw();
-            ir.count_breaks(10, 1);
-            motors[0].full_cw();
+            driver.setChannelPWM(i, pwm.pwmForAngle(180));
+            ir.count_breaks(10, 0);
+            driver.setChannelPWM(i, pwm.pwmForAngle(-180));
+            delay(2000);
+        }
+        if(ir.get_count() - total_count != counts.count[i]){
+            Serial.println("Misdispense Detected, Diverting to Reject.");
+            delay(1000);
+            driver.setChannelPWM(n_motors-1, pwm.pwmForAngle(60));
+            delay(1000);
+            driver.setChannelPWM(n_motors-1, pwm.pwmForAngle(-60));
         }
     }
     if(total_count != ir.get_count()){
-        Serial.println("Misdispense Detected!");
         Serial.println("IR Beam Count: ");
         Serial.print(ir.get_count());
         Serial.println("Total Pills: ");
         Serial.print(total_count);
     }
+    pills_weight = scale.read_scale(100);
+    String A_DOW = alarms_2[0].DOW;
+    String A_t = clock.addtime_alarm(alarms_2[0].time, wait_after);
+    clock.set_alarm1(A_DOW, A_t);
     return ir.get_count();
 }
+
+bool Dispenser::pills_taken(){
+    if(pills_weight - scale.read_scale(100) <= 0.2){
+        return true;
+    }
+    Serial.println('Pills NOT taken!');
+    return false;
+}
+

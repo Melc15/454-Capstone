@@ -86,10 +86,19 @@ int Dispenser::Dispense(int wait_after){
     int total_count = 0;
     for(int i = 0; i < counts.n-1; i++){
         total_count += counts.count[i];
+        driver.setChannelPWM(i, pwm.pwmForAngle(0));
+        delay(100);
         for(int j = 0; j < counts.count[i]; j++) {
+            for(int k = 0; k >= -180; k--){
+                driver.setChannelPWM(i, pwm.pwmForAngle(k));
+                delay(10);
+            }
+            ir.count_breaks(5, 0);
+            for(int k = -180; k <= 0; k++){
+                driver.setChannelPWM(i, pwm.pwmForAngle(k));
+                delay(10);
+            }
             driver.setChannelPWM(i, pwm.pwmForAngle(180));
-            ir.count_breaks(10, 0);
-            driver.setChannelPWM(i, pwm.pwmForAngle(-180));
             delay(2000);
         }
         if(ir.get_count() - total_count != counts.count[i]){

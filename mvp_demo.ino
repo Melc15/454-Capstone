@@ -4,7 +4,7 @@ int IR_PIN = 3;
 IRSensor irs(IR_PIN);
 
 int RTC_PIN = 2;
-String DOW = "Thursday"; // Friday
+String DOW = "Friday"; // Friday
 String TIME = "12:35:59"; // arbitray time
 String DATE = "11/13/2025"; // arbitray date
 RTC rtc(RTC_PIN, DOW, TIME, DATE);
@@ -16,7 +16,7 @@ LoadCell scale(DOUT_pin, SCK_pin);
 Dispenser sys(6, rtc, irs, scale);
 volatile byte tick = 0;
 
-int pills[6] = {2, 1, 0, 0, 0, 0};
+int pills[6] = {1, 1, 1, 1, 1, 1};
 
 void setup() {
     Serial.begin(115200);

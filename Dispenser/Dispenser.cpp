@@ -4,7 +4,7 @@ Dispenser::Dispenser(int n_motors, RTC rtc, IRSensor ir, LoadCell scale): alarms
 }
 
 void Dispenser::begin(volatile byte* tick){
-    scale.begin();
+//    scale.begin();
     clock.begin(tick);
     driver.resetDevices();
     driver.init();
@@ -82,11 +82,10 @@ void Dispenser::PrintAlarms(){
 int Dispenser::Dispense(int wait_after){
     CountRow counts = pill_counts[0];
     ir.reset_counter();
-    scale.tare();
+//    scale.tare();
     int total_count = 0;
-    for(int i = 0; i < counts.n-1; i++){
+    for(int i = 0; i < counts.n - 1; i++){
         total_count += counts.count[i];
-        driver.setChannelPWM(i, pwm.pwmForAngle(0));
         delay(100);
         for(int j = 0; j < counts.count[i]; j++) {
             for(int k = 0; k >= -180; k--){
@@ -94,19 +93,24 @@ int Dispenser::Dispense(int wait_after){
                 delay(10);
             }
             ir.count_breaks(5, 0);
-            for(int k = -180; k <= 0; k++){
+            for(int k = -180; k <= 180; k++){
                 driver.setChannelPWM(i, pwm.pwmForAngle(k));
                 delay(10);
             }
-            driver.setChannelPWM(i, pwm.pwmForAngle(180));
-            delay(2000);
+            delay(1000);
         }
         if(ir.get_count() - total_count != counts.count[i]){
             Serial.println("Misdispense Detected, Diverting to Reject.");
             delay(1000);
-            driver.setChannelPWM(n_motors-1, pwm.pwmForAngle(60));
+            driver.setChannelPWM(counts.n, pwm.pwmForAngle(100));
             delay(1000);
-            driver.setChannelPWM(n_motors-1, pwm.pwmForAngle(-60));
+            driver.setChannelPWM(counts.n, pwm.pwmForAngle(0));
+        }
+        else{
+            delay(1000);
+            driver.setChannelPWM(counts.n, pwm.pwmForAngle(-100));
+            delay(1000);
+            driver.setChannelPWM(counts.n, pwm.pwmForAngle(0));
         }
     }
     if(total_count != ir.get_count()){
@@ -115,7 +119,7 @@ int Dispenser::Dispense(int wait_after){
         Serial.println("Total Pills: ");
         Serial.print(total_count);
     }
-    pills_weight = scale.read_scale(100);
+//    pills_weight = scale.read_scale(100);
     String A_DOW = alarms_2[0].DOW;
     String A_t = clock.addtime_alarm(alarms_2[0].time, wait_after);
     clock.set_alarm1(A_DOW, A_t);

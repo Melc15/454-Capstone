@@ -85,32 +85,32 @@ int Dispenser::Dispense(int wait_after){
 //    scale.tare();
     int total_count = 0;
     for(int i = 0; i < counts.n - 1; i++){
+                delay(1000);
         total_count += counts.count[i];
-        delay(100);
         for(int j = 0; j < counts.count[i]; j++) {
             for(int k = 0; k >= -180; k--){
                 driver.setChannelPWM(i, pwm.pwmForAngle(k));
-                delay(10);
             }
-            ir.count_breaks(5, 0);
+            ir.count_breaks(2, 0);
             for(int k = -180; k <= 180; k++){
                 driver.setChannelPWM(i, pwm.pwmForAngle(k));
-                delay(10);
+                delay(2);
             }
-            delay(1000);
         }
-        if(ir.get_count() - total_count != counts.count[i]){
-            Serial.println("Misdispense Detected, Diverting to Reject.");
-            delay(1000);
-            driver.setChannelPWM(counts.n, pwm.pwmForAngle(100));
-            delay(1000);
-            driver.setChannelPWM(counts.n, pwm.pwmForAngle(0));
-        }
-        else{
-            delay(1000);
-            driver.setChannelPWM(counts.n, pwm.pwmForAngle(-100));
-            delay(1000);
-            driver.setChannelPWM(counts.n, pwm.pwmForAngle(0));
+        if(counts.count[i] != 0){
+            if(ir.get_count() - total_count != counts.count[i]){
+                Serial.println("Misdispense Detected, Diverting to Reject.");
+                delay(1000);
+                driver.setChannelPWM(counts.n, pwm.pwmForAngle(100));
+                delay(1000);
+                driver.setChannelPWM(counts.n, pwm.pwmForAngle(0));
+            }
+            else{
+                delay(1000);
+                driver.setChannelPWM(counts.n, pwm.pwmForAngle(-100));
+                delay(1000);
+                driver.setChannelPWM(counts.n, pwm.pwmForAngle(0));
+            }
         }
     }
     if(total_count != ir.get_count()){

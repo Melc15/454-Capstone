@@ -1,0 +1,35 @@
+#define BLYNK_TEMPLATE_NAME "PillDispenser"
+#define BLYNK_AUTH_TOKEN "SJy8pwjyixZikbSMy4EoRlVs8nTVM2h0"
+#define BLYNK_TEMPLATE_ID "TMPL2A3IauHWb"
+
+#include <WiFi.h>
+#include <BlynkSimpleEsp32.h>
+#include <WiFiManager.h>
+
+HardwareSerial MegaSerial(1);   // UART1 on ESP32
+
+
+void setup() {
+    Serial.begin(115200);
+    MegaSerial.begin(9600, SERIAL_8N1, 16, 17);
+  
+    WiFiManager wm;
+    wm.autoConnect("ESP32_Setup");
+  
+    Blynk.begin(BLYNK_AUTH_TOKEN, WiFi.SSID().c_str(), WiFi.psk().c_str());
+  }
+  
+  void loop() {
+    Blynk.run();
+  
+    if (MegaSerial.available()) {
+      String msg = MegaSerial.readStringUntil('\n');
+      msg.trim();
+  
+      if (msg == "MISDISPENSE") {
+        Blynk.logEvent("misdispense_event", "❗ MISDISPENSE detected");
+        Serial.println("Alert sent to Blynk!");
+      }
+    }
+  }
+

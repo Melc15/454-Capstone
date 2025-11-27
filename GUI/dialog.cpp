@@ -12,7 +12,6 @@ QTableWidget* createCmpTable(QWidget *parent = nullptr)
     }
     table->setVerticalHeaderLabels(rowLabels);
 
-    // Optional: some table settings
     table->horizontalHeader()->setStretchLastSection(true);
     table->verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
 
@@ -51,7 +50,7 @@ Dialog::Dialog(QWidget *parent)
 
     if(arduino_is_available){
         arduino->setPortName(arduino_port_name);
-        arduino->open(QSerialPort::WriteOnly);
+        arduino->open(QSerialPort::ReadWrite);
         arduino->setBaudRate(QSerialPort::Baud115200);
         arduino->setDataBits(QSerialPort::Data8);
         arduino->setParity(QSerialPort::NoParity);
@@ -93,6 +92,7 @@ Dialog::Dialog(QWidget *parent)
 
     ui->button_sun->setChecked(true);
     ui->stack_week->setCurrentIndex(0);
+    loadAlarmsFromArduino();
 }
 Dialog::~Dialog()
 {
@@ -116,9 +116,6 @@ void Dialog::on_AddAlarm_Button_clicked()
         QString text = comboAlarms->itemText(i);
         QTime t = QTime::fromString(text, "h:mm AP");
         std::string military = t.toString("HH:mm:ss").toStdString();
-        if(military == time){
-            return;
-        }
     }
     QTableWidget *table = createCmpTable(page);
     layout->addWidget(table);
@@ -131,8 +128,6 @@ void Dialog::on_AddAlarm_Button_clicked()
             stackPills, &QStackedWidget::setCurrentIndex,
             Qt::UniqueConnection);
 
-
-    printf("Hello");
     if(DOW == "Sun"){
         sun.add_alarm(time);
     }
@@ -164,7 +159,7 @@ void Dialog::on_AddAlarm_Button_clicked()
     }
 }
 
-void Dialog::on_addpills_button_clicked()
+void Dialog::on_setpills_button_clicked()
 {
     int cmpt = ui->cmpt_input->value() - 1;
 
@@ -208,7 +203,7 @@ void Dialog::on_addpills_button_clicked()
 }
 
 
-void Dialog::on_removealarm_button_2_clicked()
+void Dialog::on_removealarm_button_clicked()
 {
     QWidget *outerPage = ui->stack_week->currentWidget();
     auto *comboAlarms = outerPage->findChild<QComboBox*>();
@@ -252,6 +247,8 @@ void sendDay(std::string dayName, const DOW& day, QSerialPort* arduino)
     arduino->write("CLEAR\n");
     for (Alarm x : day.alarms) {
         qDebug() << "Alarm write start";
+        qDebug() << x.time;
+        qDebug() << x.pill_counts;
         arduino->write("BEGIN\n");
         arduino->write(dayName.c_str());
         arduino->write("\n");
@@ -283,7 +280,7 @@ void Dialog::on_arduino_button_clicked()
 }
 
 
-void Dialog::on_addpills_button_2_clicked()
+void Dialog::on_setforall_button_clicked()
 {
     qDebug() << "Hello";
     int cmpt = ui->cmpt_input->value() - 1;
@@ -297,7 +294,6 @@ void Dialog::on_addpills_button_2_clicked()
     if (!stackPills || !comboAlarms) return;
     if (comboAlarms->count() == 0) return;
 
-    // ---- 1) Update ALL alarm tables in UI using combo->itemData(pageIndex) ----
     for (int i = 0; i < comboAlarms->count(); ++i) {
 
         int pageIndex = comboAlarms->itemData(i).toInt();
@@ -320,7 +316,6 @@ void Dialog::on_addpills_button_2_clicked()
         table->item(cmpt, 0)->setTextAlignment(Qt::AlignCenter);
     }
 
-    // ---- 2) Update ALL alarms in the DATA MODEL for this day ----
     if (DOW == "Sun") {
         for (Alarm &a : sun.alarms) {
             if ((int)a.pill_counts.size() > cmpt) a.pill_counts[cmpt] = val;
@@ -375,20 +370,18 @@ void Dialog::on_changetime_button_clicked()
     int currentIndex = comboAlarms->currentIndex();
     if (currentIndex < 0) return;
 
-    // preserve the correct page index for THIS alarm
     int pageIndex = comboAlarms->itemData(currentIndex).toInt();
 
-    // old time from current combo text (display format)
     QString oldText = comboAlarms->currentText();
     QTime oldT = QTime::fromString(oldText, "h:mm AP");
     std::string old_time = oldT.toString("HH:mm:ss").toStdString();
 
-    // new time from timeEdit
+
     QTime newT = ui->timeEdit->time();
     std::string new_time = newT.toString("HH:mm:ss").toStdString();
     QString newDisplay = newT.toString("h:mm AP");
 
-    // prevent duplicates in this day's combo
+
     for (int i = 0; i < comboAlarms->count(); ++i) {
         if (i == currentIndex) continue;
         QTime t = QTime::fromString(comboAlarms->itemText(i), "h:mm AP");
@@ -397,11 +390,10 @@ void Dialog::on_changetime_button_clicked()
         }
     }
 
-    // update combo display text but keep same page mapping
     comboAlarms->setItemText(currentIndex, newDisplay);
     comboAlarms->setItemData(currentIndex, pageIndex);
 
-    // (optional) make sure stack is still showing the correct page
+
     stackPills->setCurrentIndex(pageIndex);
 
     // update model
@@ -412,4 +404,322 @@ void Dialog::on_changetime_button_clicked()
     if(DOW == "Thu") thu.set_time(new_time, old_time);
     if(DOW == "Fri") fri.set_time(new_time, old_time);
     if(DOW == "Sat") sat.set_time(new_time, old_time);
+}
+
+void Dialog::on_repeatalarm_button_clicked()
+{
+
+    QWidget *currentOuter = ui->stack_week->currentWidget();
+    if (!currentOuter) return;
+
+    auto *currentStackPills  = currentOuter->findChild<QStackedWidget*>();
+    auto *currentComboAlarms = currentOuter->findChild<QComboBox*>();
+    if (!currentStackPills || !currentComboAlarms) return;
+
+    int currentAlarmIndex = currentComboAlarms->currentIndex();
+    if (currentAlarmIndex < 0) return;
+
+    int currentPageIndex = currentComboAlarms->itemData(currentAlarmIndex).toInt();
+    if (currentPageIndex < 0 || currentPageIndex >= currentStackPills->count())
+        currentPageIndex = currentAlarmIndex; // fallback
+
+    QWidget *currentAlarmPage = currentStackPills->widget(currentPageIndex);
+    if (!currentAlarmPage) return;
+
+    QTableWidget *currentTable = currentAlarmPage->findChild<QTableWidget*>();
+    if (!currentTable) return;
+
+    QString displayText = currentComboAlarms->currentText();
+    QTime t = QTime::fromString(displayText, "h:mm AP");
+    if (!t.isValid()) return;
+
+    QString military = t.toString("HH:mm:ss");
+    std::string timeStr = military.toStdString();
+
+    int rowCount = currentTable->rowCount();
+    QVector<int> pills(rowCount);
+    for (int r = 0; r < rowCount; ++r) {
+        QTableWidgetItem *item = currentTable->item(r, 0);
+        int v = item ? item->text().toInt() : 0;
+        pills[r] = v;
+    }
+
+
+    auto cloneToDay = [&](int dayIndex, class::DOW &day) {
+
+        QWidget *outerPage = ui->stack_week->widget(dayIndex);
+        if (!outerPage) return;
+
+        auto *stackPills  = outerPage->findChild<QStackedWidget*>();
+        auto *comboAlarms = outerPage->findChild<QComboBox*>();
+        if (!stackPills || !comboAlarms) return;
+
+        for (int i = 0; i < comboAlarms->count(); ++i) {
+            QTime existing =
+                QTime::fromString(comboAlarms->itemText(i), "h:mm AP");
+            if (!existing.isValid()) continue;
+            if (existing.toString("HH:mm:ss") == military) {
+                return; // already have this time, do nothing
+            }
+        }
+
+
+        QWidget *page = new QWidget(stackPills);
+        auto *layout  = new QVBoxLayout(page);
+
+        QTableWidget *table = createCmpTable(page);
+        layout->addWidget(table);
+        page->setLayout(layout);
+
+        int pageIndex  = stackPills->addWidget(page);
+        int comboIndex = comboAlarms->count();
+
+        comboAlarms->addItem(displayText);
+        comboAlarms->setItemData(comboIndex, pageIndex);
+
+
+        QObject::connect(comboAlarms,
+                         QOverload<int>::of(&QComboBox::currentIndexChanged),
+                         stackPills, &QStackedWidget::setCurrentIndex,
+                         Qt::UniqueConnection);
+
+        // 3) fill the new table with the copied pills
+        for (int r = 0; r < table->rowCount(); ++r) {
+            if (!table->item(r, 0))
+                table->setItem(r, 0, new QTableWidgetItem());
+            QTableWidgetItem *item = table->item(r, 0);
+            int v = (r < pills.size()) ? pills[r] : 0;
+            item->setText(QString::number(v));
+            item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+            item->setTextAlignment(Qt::AlignCenter);
+        }
+
+        // 4) update the data model for that day
+        day.add_alarm(timeStr); // your DOW API
+        for (int c = 0; c < pills.size(); ++c) {
+            day.set_pills(timeStr, c, pills[c]);
+        }
+    };
+
+    int currentDayIndex = ui->stack_week->currentIndex();
+
+    if (ui->sunday_check->isChecked()   && currentDayIndex != 0) cloneToDay(0, sun);
+    if (ui->monday_check->isChecked()   && currentDayIndex != 1) cloneToDay(1, mon);
+    if (ui->tuesday_check->isChecked()  && currentDayIndex != 2) cloneToDay(2, tue);
+    if (ui->wednesday_check->isChecked()&& currentDayIndex != 3) cloneToDay(3, wed);
+    if (ui->thursday_check->isChecked() && currentDayIndex != 4) cloneToDay(4, thu);
+    if (ui->friday_check->isChecked()   && currentDayIndex != 5) cloneToDay(5, fri);
+    if (ui->saturday_check->isChecked() && currentDayIndex != 6) cloneToDay(6, sat);
+}
+
+
+
+
+void Dialog::on_checkall_button_clicked()
+{
+    ui->sunday_check->setChecked(true);
+    ui->monday_check->setChecked(true);
+    ui->tuesday_check->setChecked(true);
+    ui->wednesday_check->setChecked(true);
+    ui->thursday_check->setChecked(true);
+    ui->friday_check->setChecked(true);
+    ui->saturday_check->setChecked(true);
+}
+
+
+void Dialog::on_uncheckall_button_clicked()
+{
+    ui->sunday_check->setChecked(false);
+    ui->monday_check->setChecked(false);
+    ui->tuesday_check->setChecked(false);
+    ui->wednesday_check->setChecked(false);
+    ui->thursday_check->setChecked(false);
+    ui->friday_check->setChecked(false);
+    ui->saturday_check->setChecked(false);
+}
+
+
+void Dialog::on_clear_button_clicked()
+{
+    int cmpt = ui->cmpt_input->value() - 1;
+
+    QWidget *outerPage = ui->stack_week->currentWidget();
+    auto *stackPills  = outerPage->findChild<QStackedWidget*>();
+    auto *comboAlarms = outerPage->findChild<QComboBox*>();
+    QWidget *alarmPage = stackPills->currentWidget();
+    int currentIndex = comboAlarms->currentIndex();
+    if (currentIndex < 0) return;
+    QTableWidget *table = alarmPage->findChild<QTableWidget*>();
+    table->item(cmpt, 0)->setText(QString('0'));
+    QString text = ui->combo_alarms->currentText();
+    QTime t = QTime::fromString(text, "h:mm AP");
+    QString military = t.toString("HH:mm:ss");
+    if(DOW == "Sun"){
+        sun.set_pills(military.toStdString(), cmpt, 0);
+    }
+    if(DOW == "Mon"){
+        mon.set_pills(military.toStdString(), cmpt, 0);
+    }
+    if(DOW == "Tue"){
+        tue.set_pills(military.toStdString(), cmpt, 0);
+    }
+    if(DOW == "Wed"){
+        wed.set_pills(military.toStdString(), cmpt, 0);
+    }
+    if(DOW == "Thu"){
+        thu.set_pills(military.toStdString(), cmpt, 0);
+    }
+    if(DOW == "Fri"){
+        fri.set_pills(military.toStdString(), cmpt, 0);
+    }
+    if(DOW == "Sat"){
+        sat.set_pills(military.toStdString(), cmpt, 0);
+    }
+
+    for (Alarm& x : sun.alarms) {
+        qDebug() << x.time;
+        qDebug() << x.pill_counts;
+    }
+}
+
+int Dialog::dayIndexFromName(const QString &dayName)
+{
+    if (dayName.compare("Sunday",   Qt::CaseInsensitive) == 0) return 0;
+    if (dayName.compare("Monday",   Qt::CaseInsensitive) == 0) return 1;
+    if (dayName.compare("Tuesday",  Qt::CaseInsensitive) == 0) return 2;
+    if (dayName.compare("Wednesday",Qt::CaseInsensitive) == 0) return 3;
+    if (dayName.compare("Thursday", Qt::CaseInsensitive) == 0) return 4;
+    if (dayName.compare("Friday",   Qt::CaseInsensitive) == 0) return 5;
+    if (dayName.compare("Saturday", Qt::CaseInsensitive) == 0) return 6;
+    return -1;
+}
+
+class::DOW* Dialog::dayModelFromName(const QString &dayName)
+{
+    if (dayName.compare("Sunday",   Qt::CaseInsensitive) == 0) return &sun;
+    if (dayName.compare("Monday",   Qt::CaseInsensitive) == 0) return &mon;
+    if (dayName.compare("Tuesday",  Qt::CaseInsensitive) == 0) return &tue;
+    if (dayName.compare("Wednesday",Qt::CaseInsensitive) == 0) return &wed;
+    if (dayName.compare("Thursday", Qt::CaseInsensitive) == 0) return &thu;
+    if (dayName.compare("Friday",   Qt::CaseInsensitive) == 0) return &fri;
+    if (dayName.compare("Saturday", Qt::CaseInsensitive) == 0) return &sat;
+    return nullptr;
+}
+
+void Dialog::addAlarmFromArduino(const QString &dayName,
+                                 const QString &timeHHMMSS,
+                                 const QVector<int> &pills)
+{
+    int idx = dayIndexFromName(dayName);
+    if (idx < 0) return;
+
+    class::DOW *model = dayModelFromName(dayName);
+    if (!model) return;
+
+    // UI containers for that day
+    QWidget *outerPage = ui->stack_week->widget(idx);
+    if (!outerPage) return;
+
+    auto *stackPills  = outerPage->findChild<QStackedWidget*>();
+    auto *comboAlarms = outerPage->findChild<QComboBox*>();
+    if (!stackPills || !comboAlarms) return;
+
+    // prevent duplicates
+    for (int i = 0; i < comboAlarms->count(); ++i) {
+        QTime t = QTime::fromString(comboAlarms->itemText(i), "h:mm AP");
+        if (!t.isValid()) continue;
+        if (t.toString("HH:mm:ss") == timeHHMMSS) {
+            return; // already exists
+        }
+    }
+
+    // make UI page
+    QWidget *page = new QWidget(stackPills);
+    auto *layout  = new QVBoxLayout(page);
+    QTableWidget *table = createCmpTable(page);
+    layout->addWidget(table);
+    page->setLayout(layout);
+
+    int pageIndex  = stackPills->addWidget(page);
+    int comboIndex = comboAlarms->count();
+
+    // display time in "h:mm AP"
+    QTime t = QTime::fromString(timeHHMMSS, "HH:mm:ss");
+    QString display = t.toString("h:mm AP");
+
+    comboAlarms->addItem(display);
+    comboAlarms->setItemData(comboIndex, pageIndex);
+
+    connect(comboAlarms, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            stackPills, &QStackedWidget::setCurrentIndex,
+            Qt::UniqueConnection);
+
+    // fill pills in table
+    for (int r = 0; r < table->rowCount(); ++r) {
+        if (!table->item(r, 0))
+            table->setItem(r, 0, new QTableWidgetItem());
+        int v = (r < pills.size()) ? pills[r] : 0;
+        QTableWidgetItem *item = table->item(r, 0);
+        item->setText(QString::number(v));
+        item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+        item->setTextAlignment(Qt::AlignCenter);
+    }
+
+    // update model
+    std::string timeStd = timeHHMMSS.toStdString();
+    model->add_alarm(timeStd);
+    for (int c = 0; c < pills.size(); ++c) {
+        model->set_pills(timeStd, c, pills[c]);
+    }
+}
+
+void Dialog::loadAlarmsFromArduino()
+{
+    if (!arduino_is_available || !arduino || !arduino->isOpen())
+        return;
+
+    // ask Arduino for all alarms
+    arduino->write("DUMP\n");
+    arduino->waitForBytesWritten(200);
+
+    QByteArray buffer;
+    // read until we see "DONE" or timeout
+    while (arduino->waitForReadyRead(200)) {
+        buffer += arduino->readAll();
+        if (buffer.contains("DONE"))
+            break;
+    }
+
+    QList<QByteArray> lines = buffer.split('\n');
+    int i = 0;
+    while (i < lines.size()) {
+        QString line = QString::fromUtf8(lines[i]).trimmed();
+        if (line == "BEGIN") {
+            if (i + 4 >= lines.size()) break; // incomplete
+
+            QString dayName = QString::fromUtf8(lines[i+1]).trimmed();
+            QString timeStr = QString::fromUtf8(lines[i+2]).trimmed();
+            QString pillsLine = QString::fromUtf8(lines[i+3]).trimmed();
+            QString endLine = QString::fromUtf8(lines[i+4]).trimmed();
+
+            if (endLine != "END") {
+                i += 1;
+                continue; // malformed block, skip
+            }
+
+            // parse pills
+            QVector<int> pills;
+            for (const QString &tok : pillsLine.split(' ', Qt::SkipEmptyParts)) {
+                pills.append(tok.toInt());
+            }
+
+            addAlarmFromArduino(dayName, timeStr, pills);
+
+            i += 5;
+        } else if (line == "DONE") {
+            break;
+        } else {
+            ++i;
+        }
+    }
 }

@@ -35,8 +35,10 @@ void loop() {
         // read header
         String header = Serial.readStringUntil('\n');
         header.trim();
-
-        if(header == "CLEAR"){
+        if(header == 'DUMP'){
+            sys.DumpAlarmsToSerial();
+        }
+        else if(header == "CLEAR"){
             sys.ClearAlarms();
         }
         else if (header != "BEGIN") {
@@ -69,6 +71,7 @@ void loop() {
             }
         }
     }
+    
     if (tick) {
         tick = 0;
         sys.Dispense(0);

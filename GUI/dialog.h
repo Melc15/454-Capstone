@@ -37,16 +37,30 @@ private slots:
 
     void on_AddAlarm_Button_clicked();
 
-    void on_addpills_button_clicked();
-
-    void on_removealarm_button_2_clicked();
-
     void on_arduino_button_clicked();
-
-    void on_addpills_button_2_clicked();
 
     void on_changetime_button_clicked();
 
+    void on_repeatalarm_button_clicked();
+
+    void on_removealarm_button_clicked();
+
+    void on_setforall_button_clicked();
+
+    void on_setpills_button_clicked();
+
+    void on_checkall_button_clicked();
+
+    void on_uncheckall_button_clicked();
+
+    void on_clear_button_clicked();
+
+    int dayIndexFromName(const QString &dayName);
+    class::DOW* dayModelFromName(const QString &dayName);
+    void addAlarmFromArduino(const QString &dayName,
+                             const QString &timeHHMMSS,
+                             const QVector<int> &pills);
+    void loadAlarmsFromArduino();
 private:
     Ui::Dialog *ui;
     QSerialPort *arduino;

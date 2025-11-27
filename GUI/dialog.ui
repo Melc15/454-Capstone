@@ -271,7 +271,7 @@
     <number>12</number>
    </property>
   </widget>
-  <widget class="QPushButton" name="addpills_button">
+  <widget class="QPushButton" name="setpills_button">
    <property name="geometry">
     <rect>
      <x>250</x>
@@ -459,7 +459,7 @@
     </rect>
    </property>
    <property name="currentIndex">
-    <number>0</number>
+    <number>1</number>
    </property>
    <widget class="QWidget" name="Sunday">
     <widget class="QComboBox" name="combo_alarms">
@@ -531,6 +531,11 @@
        <height>181</height>
       </rect>
      </property>
+     <property name="font">
+      <font>
+       <kerning>true</kerning>
+      </font>
+     </property>
      <property name="currentIndex">
       <number>-1</number>
      </property>
@@ -550,7 +555,7 @@
     <widget class="QStackedWidget" name="stack_pills_6">
      <property name="geometry">
       <rect>
-       <x>-10</x>
+       <x>0</x>
        <y>20</y>
        <width>191</width>
        <height>181</height>
@@ -715,7 +720,7 @@
     <string/>
    </property>
   </widget>
-  <widget class="QPushButton" name="removealarm_button_2">
+  <widget class="QPushButton" name="removealarm_button">
    <property name="geometry">
     <rect>
      <x>360</x>
@@ -732,7 +737,7 @@
    <property name="geometry">
     <rect>
      <x>60</x>
-     <y>230</y>
+     <y>240</y>
      <width>91</width>
      <height>51</height>
     </rect>
@@ -744,14 +749,20 @@
     <string>Arduino Upload</string>
    </property>
   </widget>
-  <widget class="QPushButton" name="addpills_button_2">
+  <widget class="QPushButton" name="setforall_button">
    <property name="geometry">
     <rect>
      <x>250</x>
      <y>200</y>
      <width>81</width>
-     <height>24</height>
+     <height>21</height>
     </rect>
+   </property>
+   <property name="font">
+    <font>
+     <strikeout>false</strikeout>
+     <kerning>true</kerning>
+    </font>
    </property>
    <property name="text">
     <string>Set for All</string>
@@ -769,6 +780,161 @@
    <property name="text">
     <string>Change Time</string>
    </property>
+  </widget>
+  <widget class="QPushButton" name="repeatalarm_button">
+   <property name="geometry">
+    <rect>
+     <x>580</x>
+     <y>130</y>
+     <width>91</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string> Repeat Alarm</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="checkall_button">
+   <property name="geometry">
+    <rect>
+     <x>580</x>
+     <y>230</y>
+     <width>91</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Check All</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="uncheckall_button">
+   <property name="geometry">
+    <rect>
+     <x>580</x>
+     <y>260</y>
+     <width>91</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Uncheck All</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="clear_button">
+   <property name="geometry">
+    <rect>
+     <x>160</x>
+     <y>170</y>
+     <width>80</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Clear CMP</string>
+   </property>
+  </widget>
+  <widget class="QWidget" name="">
+   <property name="geometry">
+    <rect>
+     <x>680</x>
+     <y>130</y>
+     <width>87</width>
+     <height>151</height>
+    </rect>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QCheckBox" name="sunday_check">
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>21</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>Sunday</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QCheckBox" name="monday_check">
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>21</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>Monday</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QCheckBox" name="tuesday_check">
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>21</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>Tuesday</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QCheckBox" name="wednesday_check">
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>21</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>Wednesday</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QCheckBox" name="thursday_check">
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>21</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>Thursday</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QCheckBox" name="friday_check">
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>21</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>Friday</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QCheckBox" name="saturday_check">
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>21</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>Saturday</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
   </widget>
  </widget>
  <resources/>

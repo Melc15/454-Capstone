@@ -1,16 +1,17 @@
 #include "Dispenser.h"
 
-Dispenser::Dispenser(int n_motors, RTC rtc, IRSensor ir, LoadCell scale, SoftwareSerial serial): MP3Player(), Serial(serial), alarms_1(alarms_store1), alarms_2(alarms_store2), pill_counts(pills_store), driver(), clock(rtc), ir(ir), n_motors(n_motors), pwm(112, 550), scale(scale), pills_weight(-1)
+Dispenser::Dispenser(int n_motors, RTC rtc, IRSensor ir, LoadCell scale, SoftwareSerial softserial, DFRobotDFPlayerMini mp3serial): MP3Player(mp3serial), mp3Serial(softserial), alarms_1(alarms_store1), alarms_2(alarms_store2), pill_counts(pills_store), driver(), clock(rtc), ir(ir), n_motors(n_motors), pwm(112, 550), scale(scale), pills_weight(-1)
 {
+   mp3Serial.begin(115200);
 }
 
 void Dispenser::begin(volatile byte* tick){
-//    scale.begin();
+    scale.begin();
     clock.begin(tick);
     driver.resetDevices();
     driver.init();
     driver.setPWMFrequency(50);
-    Serial.begin(9600);
+    MP3Player.begin(mp3Serial);
     MP3Player.setTimeOut(500);
     MP3Player.volume(30);
     MP3Player.EQ(0);
@@ -87,7 +88,7 @@ void Dispenser::PrintAlarms(){
 int Dispenser::Dispense(int wait_after){
     CountRow counts = pill_counts[0];
     ir.reset_counter();
-//    scale.tare();
+    scale.tare();
     int total_count = 0;
     for(int i = 0; i < counts.n - 1; i++){
         delay(1000);
@@ -124,7 +125,7 @@ int Dispenser::Dispense(int wait_after){
         Serial.println("Total Pills: ");
         Serial.print(total_count);
     }
-//    pills_weight = scale.read_scale(100);
+    pills_weight = scale.read_scale(100);
     String A_DOW = alarms_2[0].DOW;
     String A_t = clock.addtime_alarm(alarms_2[0].time, wait_after);
     clock.set_alarm1(A_DOW, A_t);
@@ -136,12 +137,12 @@ bool Dispenser::ClearAlarms(){
         return false;
     }
 
-    for(i = 0; i < alarms_1.size(); i++)
+    for(int i = 0; i < alarms_1.size(); i++) {
         alarms_1.remove(i);
         alarms_2.remove(i);
         pill_counts.remove(i);
+    }
     return true;
-    for()
 }
 void Dispenser::toggle_song(int i){
     MP3Player.play(i);

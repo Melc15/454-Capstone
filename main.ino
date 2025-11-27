@@ -5,12 +5,17 @@ int IR_PIN = 4;
 IRSensor irs(IR_PIN);
 
 int RTC_PIN = 2;
-String DOW = "Sunday"; // Friday
-String TIME = "23:55:40"; // arbitray time
-String DATE = "10/31/2025"; // arbitray date
-RTC rtc(RTC_PIN, DOW, TIME, DATE);
+DateTime temp(__DATE__, __TIME__);
+byte dd = temp.day();
+byte mm = temp.month();
+byte yyyy = temp.year();
+byte hr = temp.hour();
+byte min = temp.minute();
+byte sec = temp.second();
+byte DOW = 4;
+RTC rtc(RTC_PIN, mm, dd, yyyy, hr, min, sec, DOW);
 
-int DOUT_pin = 4;
+int DOUT_pin = 6;
 int SCK_pin = 5;
 LoadCell scale(DOUT_pin, SCK_pin);
 
@@ -27,7 +32,6 @@ void setup() {
     sys.begin(&tick);
     scale.set_calibration(17131.14);
     delay(10);
-    sys.toggle_song(0);
 }
 
 void loop() {
@@ -35,20 +39,21 @@ void loop() {
         // read header
         String header = Serial.readStringUntil('\n');
         header.trim();
-        if(header == 'DUMP'){
+        if(header == "DUMP"){
             sys.DumpAlarmsToSerial();
         }
         else if(header == "CLEAR"){
             sys.ClearAlarms();
         }
-        else if (header != "BEGIN") {
-            while (Serial.available() > 0) Serial.read();
-        } else {
+        else if (header == "PRINT") {
+            Serial.println("Alarms:");
+            sys.PrintAlarms();           // <-- only prints when you send PRINT
+        }
+        else if(header == "BEGIN"){
             // read DOW and time
             String DOW_read  = Serial.readStringUntil('\n');
 
             String time_read = Serial.readStringUntil('\n');
-
             // read 12 ints
             int pills[12];
             for (int i = 0; i < 12; i++) {
@@ -90,7 +95,4 @@ void loop() {
         sys.PrintAlarms();
         delay(10);
     };
-    
-    sys.PrintAlarms();
-
 }

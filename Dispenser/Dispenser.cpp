@@ -175,7 +175,7 @@ bool Dispenser::PillsTaken(){
 void Dispenser::DumpAlarmsToSerial()
 {
     // use alarms_2 for the “real” dispense time + pill_counts
-    for (size_t i = 0; i < alarms_2.size(); ++i) {
+    for (size_t i = 0; i < alarms_2.size(); i++) {
         Serial.println("BEGIN");
 
         Serial.println(alarms_2[i].DOW);    // e.g. "Sunday"
@@ -187,7 +187,6 @@ void Dispenser::DumpAlarmsToSerial()
             if (j < C.n - 1) Serial.print(' ');
         }
         Serial.println();                   // end pill line
-
         Serial.println("END");
     }
     Serial.println("DONE");                 // sentinel

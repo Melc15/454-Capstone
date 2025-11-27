@@ -83,7 +83,7 @@ void loop() {
         while(!tick){
             delay(10);
         }
-        sys.pills_taken();
+        sys.PillsTaken();
         sys.toggle_song(0);
         sys.NextAlarm();
         Serial.println("Remaining alarms:");

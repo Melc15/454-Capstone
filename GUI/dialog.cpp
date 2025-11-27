@@ -1,5 +1,6 @@
 #include "dialog.h"
 #include "ui_dialog.h"
+#include "QThread"
 
 QTableWidget* createCmpTable(QWidget *parent = nullptr)
 {
@@ -244,14 +245,14 @@ void Dialog::on_removealarm_button_clicked()
 
 void sendDay(std::string dayName, const DOW& day, QSerialPort* arduino)
 {
-    arduino->write("CLEAR\n");
-    for (Alarm x : day.alarms) {
+    for (const Alarm &x : day.alarms) {
         qDebug() << "Alarm write start";
         qDebug() << x.time;
         qDebug() << x.pill_counts;
         arduino->write("BEGIN\n");
         arduino->write(dayName.c_str());
         arduino->write("\n");
+        qDebug() << dayName;
 
         arduino->write(x.time.c_str());
         arduino->write("\n");
@@ -259,17 +260,17 @@ void sendDay(std::string dayName, const DOW& day, QSerialPort* arduino)
         for (int y : x.pill_counts) {
             std::string s = std::to_string(y);
             arduino->write(s.c_str());
-            arduino->write("\n");      // separator so they don't smush
+            arduino->write("\n");
         }
         arduino->write("\n");         // end of this
         arduino->write("END\n");
         qDebug() << "Alarm written";
     }
-    arduino->flush();
 }
 
 void Dialog::on_arduino_button_clicked()
 {
+    arduino->write("CLEAR\n");
     sendDay("Sunday",    sun, arduino);
     sendDay("Monday",    mon, arduino);
     sendDay("Tuesday",   tue, arduino);
@@ -677,7 +678,7 @@ void Dialog::loadAlarmsFromArduino()
 {
     if (!arduino_is_available || !arduino || !arduino->isOpen())
         return;
-
+    QThread::msleep(1000);
     // ask Arduino for all alarms
     arduino->write("DUMP\n");
     arduino->waitForBytesWritten(200);
@@ -712,7 +713,7 @@ void Dialog::loadAlarmsFromArduino()
             for (const QString &tok : pillsLine.split(' ', Qt::SkipEmptyParts)) {
                 pills.append(tok.toInt());
             }
-
+            qDebug() << dayName;
             addAlarmFromArduino(dayName, timeStr, pills);
 
             i += 5;
@@ -722,4 +723,5 @@ void Dialog::loadAlarmsFromArduino()
             ++i;
         }
     }
+    arduino->flush();
 }

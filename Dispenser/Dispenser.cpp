@@ -5,6 +5,18 @@ Dispenser::Dispenser(int n_motors, RTC rtc, IRSensor ir, LoadCell scale, Softwar
    mp3Serial.begin(115200);
 }
 
+
+int DOW_to_int(const String &DOW) {
+    if (DOW == "Sunday"  || DOW == "Sun")  return 0;
+    if (DOW == "Monday"  || DOW == "Mon")  return 1;
+    if (DOW == "Tuesday" || DOW == "Tue")  return 2;
+    if (DOW == "Wednesday" || DOW == "Wed") return 3;
+    if (DOW == "Thursday"  || DOW == "Thu") return 4;
+    if (DOW == "Friday"    || DOW == "Fri") return 5;
+    if (DOW == "Saturday"  || DOW == "Sat") return 6;
+    return -1;
+}
+
 void Dispenser::begin(volatile byte* tick){
     scale.begin();
     clock.begin(tick);
@@ -16,8 +28,11 @@ void Dispenser::begin(volatile byte* tick){
     MP3Player.volume(30);
     MP3Player.EQ(0);
 }
-
 bool Dispenser::AddAlarm(String A_t, String A_DOW, int pills[], int wait_before){
+    if(DOW_to_int(A_DOW) == -1){
+        Serial.println("Invalid DOW Entered");
+        return false;
+    }
     String A_t1 = clock.subtime_alarm(A_t, wait_before);
     CountRow C{};
     C.n = n_motors;
@@ -35,6 +50,7 @@ bool Dispenser::AddAlarm(String A_t, String A_DOW, int pills[], int wait_before)
     }
     return true;
 };
+
 bool Dispenser::NextAlarm(){
     if(alarms_1.size() == 0){
         Serial.println("No alarms_1 in queue");

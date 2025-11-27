@@ -39,18 +39,19 @@ private:
 
     PCA9685 driver;
     PCA9685_ServoEval pwm;
-    SoftwareSerial Serial;
+    SoftwareSerial mp3Serial;
     DFRobotDFPlayerMini MP3Player;
 
 public:
     Dispenser() = delete;
-    Dispenser(int n_motors, RTC rtc, IRSensor ir, LoadCell scale, SoftwareSerial serial);
+    Dispenser(int n_motors, RTC rtc, IRSensor ir, LoadCell scale, SoftwareSerial softserial, DFRobotDFPlayerMini mp3serial);
     void begin(volatile byte* tick);
     bool AddAlarm(String A_t,  String A_DOW, int pills[], int wait_before = 3);
     bool NextAlarm();
     void PrintAlarms();
     bool RemoveAlarm(int number);
     int Dispense(int wait_after = 5);
+    bool ClearAlarms();
     void toggle_song(int i);
     bool pills_taken();
 };

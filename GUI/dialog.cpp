@@ -243,42 +243,149 @@ void Dialog::on_removealarm_button_clicked()
 
 }
 
-void sendDay(std::string dayName, const DOW& day, QSerialPort* arduino)
+static int dowIndexFromFullName(const QString &dayName)
 {
-    for (const Alarm &x : day.alarms) {
-        qDebug() << "Alarm write start";
-        qDebug() << x.time;
-        qDebug() << x.pill_counts;
-        arduino->write("BEGIN\n");
-        arduino->write(dayName.c_str());
-        arduino->write("\n");
-        qDebug() << dayName;
+    QString d = dayName.trimmed().toLower();
+    if (d.startsWith("monday"))    return 0;
+    if (d.startsWith("tuesday"))   return 1;
+    if (d.startsWith("wednesday")) return 2;
+    if (d.startsWith("thursday"))  return 3;
+    if (d.startsWith("friday"))    return 4;
+    if (d.startsWith("saturday"))  return 5;
+    if (d.startsWith("sunday"))    return 6;
+    return 0; // fallback
+}
 
-        arduino->write(x.time.c_str());
-        arduino->write("\n");
+static int minutesFromNowForAlarm(int alarmDowIdx,
+                                  const QTime &alarmTime,
+                                  int nowDowIdx,
+                                  const QTime &nowTime)
+{
+    const int MIN_PER_DAY = 24 * 60;
 
-        for (int y : x.pill_counts) {
-            std::string s = std::to_string(y);
-            arduino->write(s.c_str());
-            arduino->write("\n");
-        }
-        arduino->write("\n");         // end of this
-        arduino->write("END\n");
-        qDebug() << "Alarm written";
+    int nowTotal   = nowDowIdx   * MIN_PER_DAY +
+                   nowTime.hour() * 60 +
+                   nowTime.minute();
+
+    int alarmTotal = alarmDowIdx * MIN_PER_DAY +
+                     alarmTime.hour() * 60 +
+                     alarmTime.minute();
+
+    if (alarmTotal < nowTotal) {
+        alarmTotal += 7 * MIN_PER_DAY;
     }
+
+    return alarmTotal - nowTotal;
 }
 
 void Dialog::on_arduino_button_clicked()
 {
+    if (!arduino || !arduino->isOpen())
+        return;
+
     arduino->write("CLEAR\n");
-    sendDay("Sunday",    sun, arduino);
-    sendDay("Monday",    mon, arduino);
-    sendDay("Tuesday",   tue, arduino);
-    sendDay("Wednesday", wed, arduino);
-    sendDay("Thursday",  thu, arduino);
-    sendDay("Friday",    fri, arduino);
-    sendDay("Saturday",  sat, arduino);
+    arduino->waitForBytesWritten(100);
+    QThread::msleep(200);
+
+
+    arduino->write("PRINT\n");
+    arduino->waitForBytesWritten(100);
+
+    QByteArray data;
+    if (arduino->waitForReadyRead(500)) {
+        data += arduino->readAll();
+        while (arduino->waitForReadyRead(50)) {
+            data += arduino->readAll();
+        }
+    }
+
+
+    int   nowDowIdx = 0;
+    QTime nowTime(0, 0);
+
+
+    QStringList lines = QString::fromUtf8(data).split('\n', Qt::SkipEmptyParts);
+    for (const QString &raw : lines) {
+        QString line = raw.trimmed();
+        if (line.startsWith("Current RTC:", Qt::CaseInsensitive)) {
+            QString rest = line.mid(QStringLiteral("Current RTC:").length()).trimmed();
+            QStringList parts = rest.split(' ', Qt::SkipEmptyParts);
+            if (parts.size() >= 2) {
+                nowDowIdx = dowIndexFromFullName(parts[0]);
+                nowTime   = QTime::fromString(parts[1], "HH:mm:ss");
+            }
+            break;
+        }
+    }
+
+    struct AlarmToSend {
+        QString dayName;      // "Sunday"
+        QString timeHHMMSS;   // "HH:mm:ss"
+        QVector<int> pills;   // size 12
+        int sortKey;          // minutes from now until it fires
+    };
+
+    QVector<AlarmToSend> all;
+
+    auto collectDay = [&](const QString &dayName, const class::DOW &dayModel) {
+        int dayIdx = dayIndexFromName(dayName);
+        for (const Alarm &x : dayModel.alarms) {
+            AlarmToSend a;
+            a.dayName    = dayName;
+            a.timeHHMMSS = QString::fromStdString(x.time);
+            a.pills.clear();
+            a.pills.reserve(static_cast<int>(x.pill_counts.size()));
+            for (int v : x.pill_counts) {
+                a.pills.append(v);
+            }
+            while (a.pills.size() < 12) {
+                a.pills.append(0);
+            }
+
+            QTime alarmTime = QTime::fromString(a.timeHHMMSS, "HH:mm:ss");
+            if (alarmTime.isValid() && nowTime.isValid()) {
+                a.sortKey = minutesFromNowForAlarm(dayIdx, alarmTime, nowDowIdx, nowTime);
+            } else {
+
+                a.sortKey = dayIdx * 24 * 60 +
+                            alarmTime.hour() * 60 +
+                            alarmTime.minute();
+            }
+
+            all.append(a);
+        }
+    };
+
+    collectDay("Sunday",    sun);
+    collectDay("Monday",    mon);
+    collectDay("Tuesday",   tue);
+    collectDay("Wednesday", wed);
+    collectDay("Thursday",  thu);
+    collectDay("Friday",    fri);
+    collectDay("Saturday",  sat);
+
+    std::sort(all.begin(), all.end(),
+              [](const AlarmToSend &a, const AlarmToSend &b) {
+                  return a.sortKey < b.sortKey;
+              });
+
+    for (const AlarmToSend &a : all) {
+        arduino->write("BEGIN\n");
+        arduino->write(a.dayName.toUtf8());
+        arduino->write("\n");
+        arduino->write(a.timeHHMMSS.toUtf8());
+        arduino->write("\n");
+
+        for (int v : a.pills) {
+            arduino->write(QString::number(v).toUtf8());
+            arduino->write("\n");
+        }
+
+        arduino->write("\n");
+        arduino->write("END\n");
+    }
 }
+
 
 
 void Dialog::on_setforall_button_clicked()
@@ -460,7 +567,7 @@ void Dialog::on_repeatalarm_button_clicked()
                 QTime::fromString(comboAlarms->itemText(i), "h:mm AP");
             if (!existing.isValid()) continue;
             if (existing.toString("HH:mm:ss") == military) {
-                return; // already have this time, do nothing
+                return;
             }
         }
 
@@ -484,7 +591,6 @@ void Dialog::on_repeatalarm_button_clicked()
                          stackPills, &QStackedWidget::setCurrentIndex,
                          Qt::UniqueConnection);
 
-        // 3) fill the new table with the copied pills
         for (int r = 0; r < table->rowCount(); ++r) {
             if (!table->item(r, 0))
                 table->setItem(r, 0, new QTableWidgetItem());
@@ -495,8 +601,7 @@ void Dialog::on_repeatalarm_button_clicked()
             item->setTextAlignment(Qt::AlignCenter);
         }
 
-        // 4) update the data model for that day
-        day.add_alarm(timeStr); // your DOW API
+        day.add_alarm(timeStr);
         for (int c = 0; c < pills.size(); ++c) {
             day.set_pills(timeStr, c, pills[c]);
         }
@@ -625,16 +730,14 @@ void Dialog::addAlarmFromArduino(const QString &dayName,
     auto *comboAlarms = outerPage->findChild<QComboBox*>();
     if (!stackPills || !comboAlarms) return;
 
-    // prevent duplicates
     for (int i = 0; i < comboAlarms->count(); ++i) {
         QTime t = QTime::fromString(comboAlarms->itemText(i), "h:mm AP");
         if (!t.isValid()) continue;
         if (t.toString("HH:mm:ss") == timeHHMMSS) {
-            return; // already exists
+            return;
         }
     }
 
-    // make UI page
     QWidget *page = new QWidget(stackPills);
     auto *layout  = new QVBoxLayout(page);
     QTableWidget *table = createCmpTable(page);
@@ -644,7 +747,6 @@ void Dialog::addAlarmFromArduino(const QString &dayName,
     int pageIndex  = stackPills->addWidget(page);
     int comboIndex = comboAlarms->count();
 
-    // display time in "h:mm AP"
     QTime t = QTime::fromString(timeHHMMSS, "HH:mm:ss");
     QString display = t.toString("h:mm AP");
 
@@ -666,7 +768,6 @@ void Dialog::addAlarmFromArduino(const QString &dayName,
         item->setTextAlignment(Qt::AlignCenter);
     }
 
-    // update model
     std::string timeStd = timeHHMMSS.toStdString();
     model->add_alarm(timeStd);
     for (int c = 0; c < pills.size(); ++c) {
@@ -678,14 +779,13 @@ void Dialog::loadAlarmsFromArduino()
 {
     if (!arduino_is_available || !arduino || !arduino->isOpen())
         return;
+
     QThread::msleep(1000);
-    // ask Arduino for all alarms
     arduino->write("DUMP\n");
     arduino->waitForBytesWritten(200);
-
     QByteArray buffer;
-    // read until we see "DONE" or timeout
-    while (arduino->waitForReadyRead(200)) {
+
+    while (arduino->waitForReadyRead(2000)) {
         buffer += arduino->readAll();
         if (buffer.contains("DONE"))
             break;
@@ -725,3 +825,28 @@ void Dialog::loadAlarmsFromArduino()
     }
     arduino->flush();
 }
+
+
+// DEBUGGING WIDGET
+void Dialog::on_print_button_clicked()
+{
+    if (!arduino || !arduino->isOpen())
+        return;
+
+    // ask Arduino to print alarms
+    arduino->write("PRINT\n");
+    arduino->waitForBytesWritten(100);
+
+    QByteArray data;
+
+    // print what it returns
+    if (arduino->waitForReadyRead(500)) {
+        data += arduino->readAll();
+        while (arduino->waitForReadyRead(50)) {
+            data += arduino->readAll();
+        }
+    }
+
+    qDebug() << "Arduino says:\n" << data;
+}
+

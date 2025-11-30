@@ -833,13 +833,13 @@
     <string>Clear CMP</string>
    </property>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>680</x>
      <y>130</y>
      <width>87</width>
-     <height>151</height>
+     <height>178</height>
     </rect>
    </property>
    <layout class="QVBoxLayout" name="verticalLayout">
@@ -935,6 +935,19 @@
      </widget>
     </item>
    </layout>
+  </widget>
+  <widget class="QPushButton" name="print_button">
+   <property name="geometry">
+    <rect>
+     <x>210</x>
+     <y>370</y>
+     <width>75</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>PushButton</string>
+   </property>
   </widget>
  </widget>
  <resources/>

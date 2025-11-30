@@ -29,10 +29,6 @@ void Dispenser::begin(volatile byte* tick){
     MP3Player.EQ(0);
 }
 bool Dispenser::AddAlarm(String A_t, String A_DOW, int pills[], int wait_before){
-    if(DOW_to_int(A_DOW) == -1){
-        Serial.println("Invalid DOW Entered");
-        return false;
-    }
     String A_t1 = clock.subtime_alarm(A_t, wait_before);
     CountRow C{};
     C.n = n_motors;
@@ -94,9 +90,13 @@ void Dispenser::PrintAlarms(){
     for (size_t i = 0; i < alarms_1.size(); i++) {
         Serial.print(alarms_1[i].DOW);
         Serial.print(" ");
-        Serial.println(alarms_1[i].time);
-        Serial.print(" ");
         Serial.println(alarms_2[i].time);
+        Serial.print("[");
+        for(size_t j = 0; j < pill_counts[i].n, j++){
+            Serial.print(pill_counts[i].count[j]);
+            Serial.print(",")
+        }
+        Serial.println("]");
     }
 };
 
@@ -108,13 +108,14 @@ int Dispenser::Dispense(int wait_after){
     int total_count = 0;
     for(int i = 0; i < counts.n - 1; i++){
         delay(1000);
+        driver.setChannelPWM(i, pwm.pwmForAngle(0));
         total_count += counts.count[i];
         for(int j = 0; j < counts.count[i]; j++) {
-            for(int k = 0; k >= -180; k--){
+            for(int k = -180; k <= 180; k++){
                 driver.setChannelPWM(i, pwm.pwmForAngle(k));
             }
             ir.count_breaks(2, 0);
-            for(int k = -180; k <= 180; k++){
+            for(int k = 180; k >= -180; k--){
                 driver.setChannelPWM(i, pwm.pwmForAngle(k));
                 delay(2);
             }

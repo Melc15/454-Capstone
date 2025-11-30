@@ -9,7 +9,6 @@
 #include <QTAbleWidget>
 #include <QButtonGroup>
 #include <QHeaderView>
-#include <iostream>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -61,6 +60,8 @@ private slots:
                              const QString &timeHHMMSS,
                              const QVector<int> &pills);
     void loadAlarmsFromArduino();
+    void on_print_button_clicked();
+
 private:
     Ui::Dialog *ui;
     QSerialPort *arduino;
